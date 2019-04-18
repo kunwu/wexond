@@ -19,6 +19,7 @@ import { Bookmarks } from '../Bookmarks';
 import { Dial } from '../Dial';
 import { QuickMenu } from '../QuickMenu';
 import { DownloadsSection } from '../DownloadsSection';
+import { DanKeToolBox } from '../DanKeToolBox';
 
 export const Header = ({ children, clickable }: any) => {
   return (
@@ -52,14 +53,12 @@ export const Overlay = observer(() => {
         <Scrollable ref={store.overlay.scrollRef}>
           <Content>
             <SearchBox />
+            <DanKeToolBox />
             <Dial />
-
             <Title>Overview</Title>
             <TabGroups />
             {store.downloads.list.length > 0 && <DownloadsSection />}
             <QuickMenu />
-            <Title>World</Title>
-            <WeatherCard />
           </Content>
         </Scrollable>
       </Container>
