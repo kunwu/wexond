@@ -10,6 +10,7 @@ import { existsSync, writeFileSync } from 'fs';
 import { getPath } from '~/shared/utils/paths';
 import { Settings } from '~/renderer/app/models/settings';
 import { makeId } from '~/shared/utils/string';
+import { prepareSmartWindow } from '~/main/smart-window';
 
 ipcMain.setMaxListeners(0);
 
@@ -137,6 +138,7 @@ app.on('ready', () => {
   loadFilters();
   loadExtensions();
   runWebRequestService(appWindow);
+  prepareSmartWindow();
 });
 
 app.on('window-all-closed', () => {
