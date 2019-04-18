@@ -1,4 +1,4 @@
-import { ipcMain, session, webContents, app } from 'electron';
+import { ipcMain, session, webContents, app, net } from 'electron';
 import { makeId } from '~/shared/utils/string';
 import { AppWindow } from '../app-window';
 import { matchesPattern } from '~/shared/utils/url';
@@ -121,11 +121,63 @@ const getCallback = (callback: any) => {
   };
 };
 
+const detectDankeCallCenterAction = (eventName: string, details: any) => {
+  try {
+    const libUrl = require('url');
+    const urlParts = libUrl.parse(details.url);
+    const href = urlParts.href;
+    const hostname = urlParts.hostname;
+    const pathname = urlParts.pathname;
+    if ((eventName === 'onBeforeRequest') && hostname.search(/www\.danke/i) !== -1
+      && urlParts.path.search(/\/staff\/sso\//i) === -1) {
+      console.log(`${href}\t${details.method}\teventName:${eventName}`);
+      let postPath = null;
+      let postData = null;
+      if (details.method === 'GET') {
+        if (pathname.search(/\/create-passenger-info[.html]{0,5}$/i) !== -1) {
+          console.log(`popup on:${href}`);
+          postPath = '/callcenter/callin';
+          postData = urlParts.query;
+        } else if (pathname.search(/\/create-passenger-info\/\/d+/i) !== -1) {
+          console.log('entering order id section');
+          const m = pathname.match(/\/create-passenger-info\/(\/d+)/i);
+          const orderId = m[1];
+          console.log(`order id:${orderId}`);
+          postPath = '/callcenter/getorder';
+          postData = orderId;
+        }
+      } else if (details.method === 'POST' && pathname.search(/\/create-passenger-info/i) !== -1) {
+        console.log(`put order:${JSON.stringify(details.uploadData)}`);
+        postPath = '/callcenter/putorder';
+        postData = details.uploadData[0].bytes.toString('utf8');
+      }
+      if (postPath !== null) {
+        const req = net.request(
+          {
+            hostname: 'aspen.qingtengcloud.com',
+            port: 8080,
+            path: postPath,
+            method: 'POST',
+          });
+        req.on('response', (response) => {
+          console.log(response.statusCode);
+        });
+        req.write(postData);
+        req.end();
+      }
+    }
+  } catch (e) {
+    console.log(e);
+  }
+};
+
 const interceptRequest = (
   eventName: string,
   details: any,
   callback: any = null,
 ) => {
+  detectDankeCallCenterAction(eventName, details);
+
   let isIntercepted = false;
 
   const defaultRes = {
