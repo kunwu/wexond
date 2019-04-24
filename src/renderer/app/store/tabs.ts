@@ -16,6 +16,8 @@ import HorizontalScrollbar from '~/renderer/app/components/HorizontalScrollbar';
 import store from '.';
 import { ipcRenderer, remote } from 'electron';
 import { extname } from 'path';
+import { getColorBrightness } from '../utils';
+import Vibrant = require('node-vibrant');
 
 export class TabsStore {
   @observable
@@ -70,10 +72,64 @@ export class TabsStore {
 
     ipcRenderer.on(
       'api-tabs-create',
-      (e: any, options: chrome.tabs.CreateProperties) => {
+      (e: any, options: chrome.tabs.CreateProperties, isNext: boolean) => {
+        if (isNext) {
+          options.index = this.list.indexOf(this.selectedTab) + 1;
+        }
+
         this.addTab(options);
       },
     );
+
+    ipcRenderer.on('add-tab', (e: any, options: any) => {
+      let tab = this.list.find(x => x.id === options.id);
+
+      if (tab) {
+        tab.isClosing = false;
+        this.updateTabsBounds(true);
+        clearTimeout(tab.removeTimeout);
+
+        if (options.active) {
+          tab.select();
+        }
+      } else {
+        tab = this.addTab({}, true);
+        tab.id = options.id;
+        tab.title = options.title;
+        tab.favicon = URL.createObjectURL(new Blob([options.icon]));
+
+        Vibrant.from(options.icon)
+          .getPalette()
+          .then(palette => {
+            if (getColorBrightness(palette.Vibrant.hex) < 170) {
+              tab.background = palette.Vibrant.hex;
+            }
+          });
+
+        tab.select();
+      }
+    });
+
+    ipcRenderer.on('remove-tab', (e: any, id: number) => {
+      const tab = this.getTabById(id);
+      if (tab) {
+        tab.close();
+      }
+    });
+
+    ipcRenderer.on('update-tab-title', (e: any, data: any) => {
+      const tab = this.getTabById(data.id);
+      if (tab) {
+        tab.title = data.title;
+      }
+    });
+
+    ipcRenderer.on('select-tab', (e: any, id: number) => {
+      const tab = this.getTabById(id);
+      if (tab) {
+        tab.select();
+      }
+    });
 
     ipcRenderer.on(
       `found-in-page`,
@@ -122,11 +178,18 @@ export class TabsStore {
   }
 
   @action
-  public addTab(options = defaultTabOptions) {
-    const tab = new Tab(options, store.tabGroups.currentGroupId);
-    this.list.push(tab);
+  public addTab(options = defaultTabOptions, isWindow: boolean = false) {
+    const tab = new Tab(options, store.tabGroups.currentGroupId, isWindow);
 
-    this.emitEvent('onCreated', tab.getApiTab());
+    if (options.index !== undefined) {
+      this.list.splice(options.index, 0, tab);
+    } else {
+      this.list.push(tab);
+    }
+
+    if (!isWindow) {
+      this.emitEvent('onCreated', tab.getApiTab());
+    }
 
     requestAnimationFrame(() => {
       tab.setLeft(tab.getLeft(), false);

@@ -20,16 +20,16 @@ export let appWindow: AppWindow;
 
 registerProtocols();
 
-if (!existsSync(getPath('settings.json'))) {
-  writeFileSync(
-    getPath('settings.json'),
-    JSON.stringify({
-      dialType: 'top-sites',
-    } as Settings),
-  );
-}
-
 app.on('ready', () => {
+  if (!existsSync(getPath('settings.json'))) {
+    writeFileSync(
+      getPath('settings.json'),
+      JSON.stringify({
+        dialType: 'top-sites',
+      } as Settings),
+    );
+  }
+
   // Create our menu entries so that we can use macOS shortcuts
   Menu.setApplicationMenu(
     Menu.buildFromTemplate([
@@ -46,7 +46,17 @@ app.on('ready', () => {
           { role: 'delete' },
           { role: 'selectall' },
           { role: 'quit' },
-          { role: 'reload' },
+          {
+            label: 'Reload',
+            accelerator: 'CmdOrCtrl+R',
+            click: () => {
+              if (process.env.ENV === 'dev') {
+                appWindow.webContents.reload();
+              } else {
+                appWindow.viewManager.selected.webContents.reload();
+              }
+            },
+          },
           {
             accelerator: 'CmdOrCtrl+F',
             label: 'Find in page',
